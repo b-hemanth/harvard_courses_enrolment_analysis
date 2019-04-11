@@ -13,6 +13,7 @@ library(ggplot2)
 library(ggthemes)
 library(readxl)
 library(janitor)
+library(ggrepel)
 ```
 
 ```{r download_data}
@@ -88,9 +89,9 @@ plot_df %>%
     y = "Change in Enrolment", 
     color = "Department"
   ) +
-  theme(
-    axis.text.x=element_blank()
-  ) 
+  theme_solarized_2(light = FALSE) +
+  theme(axis.text.x=element_blank()) +
+  scale_color_brewer(type = "qual", palette = "Spectral") 
 
 
 ```
