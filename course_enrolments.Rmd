@@ -6,17 +6,23 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
+# I prefer my figures in the center of the page and floating alongside text; that's set up below
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.pos = "H", fig.align = "center")
+# Given that the data is downloaded every time this is knit, I want to use janitor to clean up the names of the 
+# columns to ensure that any gaps between the 2 years in spelling columns doesn't affect the data
+# Readxl lets me work with the excel files I download here
 library(tidyverse)
 library(dplyr)
 library(ggplot2)
 library(ggthemes)
 library(readxl)
 library(janitor)
-library(ggrepel)
 ```
 
 ```{r download_data}
+# DESIGN NOTE
+# I choose to download the file each time as the spring semester is ongoing and might feature updates
+# This also accounts for any future corrections or changes that could be made
 download.file(
   url = "https://registrar.fas.harvard.edu/files/fas-registrar/files/class_enrollment_summary_by_term_2.28.19.xlsx",
   destfile = "spring_2019.xlsx",
@@ -27,6 +33,8 @@ download.file(
   destfile = "spring_2018.xlsx",
   mode = "wb")
 
+# I am going to make the column names clean and only take classes with undergraduate enrolment
+# This is so because I'm only interested in Harvard FAS classes
 spring_19 <- read_excel("spring_2019.xlsx", skip = 3) %>% 
   clean_names() %>% 
   filter(!is.na(u_grad), !is.na(course_title), u_grad != 0) %>% 
@@ -37,25 +45,55 @@ spring_18 <- read_excel("spring_2018.xlsx", skip = 3) %>%
   filter(!is.na(u_grad), !is.na(course_title), u_grad != 0) %>% 
   select(course_title, course_name, course_department, u_grad)
 
+# Delete the files once they've been read into R to avoid waste of space
 fs::file_delete(c("spring_2018.xlsx", "spring_2019.xlsx"))
 ```
 
 ```{r data_pre-processing}
+# join both tables
 spring_19_18 <- spring_19 %>%
+  # DESIGN NOTE
+  # Join by course title to ensure the least possibility of error
+  # Even when course names change, these tend to be consistent
+  # I considered course_id as well but glancing at summaries of both make it seem like they're both identical in 
+  # success/errors
+  # DESIGN NOTE
+  # I use full_join because I want all courses, not just courses that exist right now
+  # This is because I only care about total interest in the department and not internal course interest
   full_join(spring_18, by = "course_title") %>%
+  # DESIGN NOTE
+  # I am removing any courses that changed departments (very few removed by this)
+  # To prevent error when grouping by department
   filter(course_department.x == course_department.y) %>%
   rename(course_department = course_department.x,
          enrol_19 = u_grad.x, 
          enrol_18 = u_grad.y) %>% 
+  # Full join causes rows to repeat because it joins once for each mention of course title
+  # ACKNOWLEDGMENT OF PROBLEM WITH THIS WAY
+  # This might cause some error by deleting course enrolments under the same course title 
+  # HOWEVER, that is unlikely
+  # First, because I later remove expos from consideration
+  # Second, because it's unlikely that courses had the same name and same 2 years' enrolments
   distinct() %>% 
+  # Getting rid of repeated columns
   select(-course_department.y, -course_name.y)
 ```
 
 ```{r department_analysis}
+# Now, I want my final plottable dataset
 plot_df <- spring_19_18 %>% 
+  # DESGIN DECISION NOTE
+  # I removed expos because it is a compulsory course
+  # ACKNOWLEDGEMENT OF ERROR
+  # Changes in its enrolment MIGHT HAVE VALUE in that they show how many people to Expos 10 and Expos studio over the years
+  # HOWEVER
+  # There is too much noise from changing first year class sizes and from those removed from the 
+  # class due to absences to actually get useful info here
   filter(course_department != "Expository Writing") %>% 
   group_by(course_department) %>% 
   summarise(sum_19 = sum(enrol_19), sum_18 = sum(enrol_18)) %>% 
+  # DESIGN NOTE
+  # I care about both positive and negative changes, so I take the absolute value and take the top 10 this way
   mutate(
     change = sum_19 - sum_18,
     absolute_change = abs(change)
@@ -63,6 +101,7 @@ plot_df <- spring_19_18 %>%
   arrange(desc(change)) %>% 
   top_n(10) %>% 
   select(-absolute_change) %>% 
+  # By observing the rows this creates, I'm cleaning the names of departments for just those that'll show on my plot
   mutate(
     course_department = as.factor(course_department),
     course_department = recode_factor(course_department,
@@ -75,8 +114,22 @@ plot_df <- spring_19_18 %>%
 
 # The Plot
 ```{r plot}
+# Plot the data using ggplot2
 plot_df %>% 
+  # DESIGN NOTE
+  # Department names are very long and putting them on the X axis makes them illegible
+  # So, I put them on the legend instead by assigning color to department
+  # ACKNOWLEDGEMENT OF ROOM FOR IMPROVEMENT
+  # Putting the department names on the key makes it harder to quickly read the graph
+  # HOWEVER
+  # This seems the most legible way to do this
+  # Further, because the key is in the same order as the plots, it's easy to read
   ggplot(aes(x = course_department, y = change, color = course_department)) +
+  # DESIGN NOTE
+  # I chose a stem plot aka a lollipop plot
+  # This is because this is more interesting than a bar graph
+  # Simulatenously, it's most legible using color key which uses the point at the end to show which is which
+  # And allows comparison while being stylistic
   geom_point() + 
   geom_segment(aes(x = course_department, xend = course_department, y = 0, yend = change)) +
   labs(
@@ -89,11 +142,17 @@ plot_df %>%
     y = "Change in Enrolment", 
     color = "Department"
   ) +
+  # DESIGN NOTE
+  # I chose this theme both because it's unconventional and interesting
+  # And, more seriosuly, because the dark background makes it easier to see and compare the light colors
   theme_solarized_2(light = FALSE) +
+  # Removing labels from the X axis
   theme(axis.text.x=element_blank()) +
+  # Adding spectral palette
+  # This brewer palette seemed easiest to compare
+  # Simultaneously, unlike most templated palettes, it has 10 colors allowing my 
+  # 10 lollipops to be represented in distinct colors
   scale_color_brewer(type = "qual", palette = "Spectral") 
-
-
 ```
 
 
