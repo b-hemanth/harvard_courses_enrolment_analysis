@@ -1,5 +1,5 @@
 ---
-title: "Course Enrolment Analysis"
+title: "Biggest Departmental Changes in Enrolments at Harvard"
 author: "Hemanth Bharatha Chakravarthy"
 date: "4/10/2019"
 output: html_document
@@ -52,6 +52,7 @@ spring_19_18 <- spring_19 %>%
 
 ```{r department_analysis}
 plot_df <- spring_19_18 %>% 
+  filter(course_department != "Expository Writing") %>% 
   group_by(course_department) %>% 
   summarise(sum_19 = sum(enrol_19), sum_18 = sum(enrol_18)) %>% 
   mutate(
@@ -60,7 +61,38 @@ plot_df <- spring_19_18 %>%
     ) %>% 
   arrange(desc(change)) %>% 
   top_n(10) %>% 
-  select(-absolute_change)
+  select(-absolute_change) %>% 
+  mutate(
+    course_department = as.factor(course_department),
+    course_department = recode_factor(course_department,
+                                      `Romance Languages & Lit` = "Romance Languages & Literature",
+                                      `African & African Amer Studies` = "African & African American Studies",
+                                      `East Asian Langs & Civ` = "East Asian Languages & Civilization")
+    )
+
+```
+
+# The Plot
+```{r plot}
+plot_df %>% 
+  ggplot(aes(x = course_department, y = change, color = course_department)) +
+  geom_point() + 
+  geom_segment(aes(x = course_department, xend = course_department, y = 0, yend = change)) +
+  labs(
+    title = "Top 10 Harvard Departments* with Biggest Changes
+    in Course Enrolments",
+    subtitle = "Changes Measured Between Spring 2018 and Spring 2019",
+    caption = "*Excluding Expository Writing
+    Data from Harvard Registrar",
+    x = "Department",
+    y = "Change in Enrolment", 
+    color = "Department"
+  ) +
+  theme(
+    axis.text.x=element_blank()
+  ) 
+
+
 ```
 
 
