@@ -114,6 +114,12 @@ plot_df <- spring_19_18 %>%
 
 # The Plot
 ```{r plot}
+# DESIGN NOTE: WHY THIS PLOT
+# This plot might interest someone like President Bacow because it represents the biggest enrolment changes between
+# Spring '18 and Spring '19. These changes are large enough to not be dismissed as random noise and represent 
+# changing interests. This could be useful in making various decisions on how to fund, provide resources for 
+# or hire faculty for different departments because it shows changing student interests 
+# between different disciplines and departments.
 # Plot the data using ggplot2
 plot_df %>% 
   # DESIGN NOTE
