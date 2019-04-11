@@ -7,4 +7,60 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.pos = "H", fig.align = "center")
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(readxl)
+library(janitor)
 ```
+
+```{r download_data}
+download.file(
+  url = "https://registrar.fas.harvard.edu/files/fas-registrar/files/class_enrollment_summary_by_term_2.28.19.xlsx",
+  destfile = "spring_2019.xlsx",
+  mode = "wb")
+
+download.file(
+  url = "https://registrar.fas.harvard.edu/files/fas-registrar/files/class_enrollment_summary_by_term_03.06.18.xlsx",
+  destfile = "spring_2018.xlsx",
+  mode = "wb")
+
+spring_19 <- read_excel("spring_2019.xlsx", skip = 3) %>% 
+  clean_names() %>% 
+  filter(!is.na(u_grad), !is.na(course_title), u_grad != 0) %>% 
+  select(course_title, course_name, course_department, u_grad)
+
+spring_18 <- read_excel("spring_2018.xlsx", skip = 3) %>% 
+  clean_names() %>% 
+  filter(!is.na(u_grad), !is.na(course_title), u_grad != 0) %>% 
+  select(course_title, course_name, course_department, u_grad)
+
+fs::file_delete(c("spring_2018.xlsx", "spring_2019.xlsx"))
+```
+
+```{r data_pre-processing}
+spring_19_18 <- spring_19 %>%
+  full_join(spring_18, by = "course_title") %>%
+  filter(course_department.x == course_department.y) %>%
+  rename(course_department = course_department.x,
+         enrol_19 = u_grad.x, 
+         enrol_18 = u_grad.y) %>% 
+  distinct() %>% 
+  select(-course_department.y, -course_name.y)
+```
+
+```{r department_analysis}
+plot_df <- spring_19_18 %>% 
+  group_by(course_department) %>% 
+  summarise(sum_19 = sum(enrol_19), sum_18 = sum(enrol_18)) %>% 
+  mutate(
+    change = sum_19 - sum_18,
+    absolute_change = abs(change)
+    ) %>% 
+  arrange(desc(change)) %>% 
+  top_n(10) %>% 
+  select(-absolute_change)
+```
+
+
